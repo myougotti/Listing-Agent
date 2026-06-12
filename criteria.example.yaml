@@ -1,0 +1,44 @@
+# Copy to criteria.yaml and edit. Loaded by config.py at startup.
+
+# Zip codes to poll. Keep this list short on the free tier.
+zip_codes:
+  - "78704"
+  - "78745"
+
+# Hard filters. A listing failing any of these is skipped before Claude.
+filters:
+  max_price: 750000
+  min_price: 250000
+  min_beds: 2
+  min_baths: 1
+  min_sqft: 900
+  max_sqft: null            # null means no cap
+  home_types:               # passed to the provider as well
+    - "Houses"
+    - "Townhomes"
+  exclude_statuses:
+    - "PENDING"
+    - "SOLD"
+
+# Soft preferences. Sent to the reasoner as context. The reasoner can weigh
+# these flexibly rather than treating them as hard rules.
+preferences:
+  must_have:
+    - "garage or covered parking"
+    - "no major flood zone"
+  nice_to_have:
+    - "yard"
+    - "post-1990 build"
+    - "single story"
+  deal_breakers:
+    - "active foundation issues mentioned in description"
+    - "HOA fee above 400 per month"
+
+# Reasoner thresholds.
+reasoner:
+  min_score_to_notify: 70
+  model: "claude-sonnet-4-6"   # adjust as needed
+
+# Polling cadence is set by the scheduler, not here. See .github/workflows/poll.yml
+# or Task Scheduler. Listed for reference only.
+target_cadence_minutes: 30

@@ -1,0 +1,42 @@
+[project]
+name = "listing-agent"
+version = "0.1.0"
+description = "Periodic real estate listing watcher with Claude-based scoring."
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.40.0",
+    "requests>=2.32.0",
+    "pydantic>=2.7.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0.1",
+    "rich>=13.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.12",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+listing-agent = "listing_agent.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

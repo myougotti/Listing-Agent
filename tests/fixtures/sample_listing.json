@@ -1,0 +1,17 @@
+{
+  "zpid": "29381838",
+  "address": "400 Academy Dr, Austin, TX 78704",
+  "price": 525000,
+  "bedrooms": 3,
+  "bathrooms": 2,
+  "livingArea": 1620,
+  "imgSrc": "https://photos.zillowstatic.com/fp/example.jpg",
+  "listingStatus": "FOR_SALE",
+  "detailUrl": "/homedetails/400-Academy-Dr-Austin-TX-78704/29381838_zpid/",
+  "propertyType": "SINGLE_FAMILY",
+  "latitude": 30.252,
+  "longitude": -97.755,
+  "lotAreaValue": 6500,
+  "lotAreaUnit": "sqft",
+  "daysOnZillow": 4
+}

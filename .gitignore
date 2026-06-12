@@ -1,0 +1,30 @@
+# Secrets
+.env
+*.env.local
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Project data
+data/
+*.db
+*.db-journal
+
+# Stray local folders pending deletion: a byte-identical nested duplicate of
+# the project, and the leftover empty clone of the GitHub repo. Keep both out
+# of the published history.
+/listing-agent/
+/Listing Agent/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/

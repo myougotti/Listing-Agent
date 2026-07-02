@@ -44,6 +44,15 @@ class ReasonerConfig:
 
 
 @dataclass(frozen=True)
+class PriceDropConfig:
+    """A drop notifies without a Claude call: the listing already interested
+    us enough to store, and the delta itself is the news."""
+
+    enabled: bool = True
+    min_drop_pct: float = 3.0  # ignore drops smaller than this percentage
+
+
+@dataclass(frozen=True)
 class AppConfig:
     rapidapi_key: str
     anthropic_api_key: str
@@ -54,6 +63,9 @@ class AppConfig:
     filters: HardFilters
     preferences: Preferences
     reasoner: ReasonerConfig
+    # Defaulted fields keep older call sites and tests valid.
+    provider: str = "zillow_rapidapi"
+    price_drops: PriceDropConfig = field(default_factory=PriceDropConfig)
 
 
 def _require(name: str) -> str:
@@ -69,8 +81,16 @@ def _default_db_path() -> Path:
     return Path(__file__).resolve().parents[2] / "data" / "seen.db"
 
 
+def resolve_db_path() -> Path:
+    """DB location without loading full config. The dashboard uses this so it
+    can run with no API keys and no criteria.yaml present."""
+    db_env = os.environ.get("LISTING_AGENT_DB_PATH", "").strip()
+    db_path = Path(db_env) if db_env else _default_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    return db_path
+
+
 def load_config(criteria_path: Path | None = None, *, require_anthropic: bool = True) -> AppConfig:
-    rapidapi_key = _require("RAPIDAPI_KEY")
     # Dry runs never construct the Reasoner, so the Anthropic key is only a
     # hard requirement for full runs. Lets you validate provider + filters
     # before setting up Anthropic billing.
@@ -80,9 +100,7 @@ def load_config(criteria_path: Path | None = None, *, require_anthropic: bool = 
         anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     discord = os.environ.get("DISCORD_WEBHOOK_URL", "").strip() or None
 
-    db_env = os.environ.get("LISTING_AGENT_DB_PATH", "").strip()
-    db_path = Path(db_env) if db_env else _default_db_path()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
+    db_path = resolve_db_path()
 
     max_calls = int(os.environ.get("LISTING_AGENT_MAX_REASONER_CALLS", "25"))
 
@@ -101,9 +119,18 @@ def load_config(criteria_path: Path | None = None, *, require_anthropic: bool = 
     filters = HardFilters(**(raw.get("filters") or {}))
     prefs = Preferences(**(raw.get("preferences") or {}))
     reasoner = ReasonerConfig(**(raw.get("reasoner") or {}))
+    price_drops = PriceDropConfig(**(raw.get("price_drops") or {}))
+    provider = str(raw.get("provider") or "zillow_rapidapi")
     zip_codes = [str(z) for z in (raw.get("zip_codes") or [])]
     if not zip_codes:
         raise ValueError("criteria.yaml must list at least one zip_codes entry.")
+
+    # Only the Zillow RapidAPI provider needs the key; Redfin's endpoints are
+    # unauthenticated. Requiring it unconditionally would block provider swaps.
+    if provider == "zillow_rapidapi":
+        rapidapi_key = _require("RAPIDAPI_KEY")
+    else:
+        rapidapi_key = os.environ.get("RAPIDAPI_KEY", "").strip()
 
     return AppConfig(
         rapidapi_key=rapidapi_key,
@@ -115,4 +142,6 @@ def load_config(criteria_path: Path | None = None, *, require_anthropic: bool = 
         filters=filters,
         preferences=prefs,
         reasoner=reasoner,
+        provider=provider,
+        price_drops=price_drops,
     )

@@ -13,13 +13,50 @@ from rich.logging import RichHandler
 
 from .config import AppConfig, load_config
 from .filters import check
+from .models import Listing
 from .notifier import ConsoleNotifier, Notifier, make_notifier
-from .providers import ZillowRapidAPIProvider
+from .providers import make_provider
 from .providers.base import Provider
 from .reasoner import Reasoner
 from .store import Store
 
 console = Console()
+
+
+def _significant_drop(cfg: AppConfig, old_price: int | None, new_price: int) -> bool:
+    """A drop is worth a ping when it clears the configured percentage.
+    Zero or missing prices are provider noise, not drops."""
+    if not cfg.price_drops.enabled or old_price is None:
+        return False
+    if old_price <= 0 or new_price <= 0 or new_price >= old_price:
+        return False
+    drop_pct = (old_price - new_price) / old_price * 100
+    return drop_pct >= cfg.price_drops.min_drop_pct
+
+
+def _handle_price_drop(
+    cfg: AppConfig,
+    store: Store,
+    notifier: Notifier,
+    listing: Listing,
+    old_price: int,
+    stats: dict,
+    dry_run: bool,
+) -> None:
+    # Filters run against the NEW price: a drop that pulls a listing into
+    # budget is exactly the drop worth hearing about, while one that leaves
+    # it out of range is still noise.
+    fr = check(listing, cfg.filters)
+    if not fr.passed:
+        console.log(f"  drop on {listing.zpid} ignored: " + "; ".join(fr.reasons))
+        return
+    if dry_run:
+        console.log(
+            f"  [dry] would notify price drop {listing.zpid}: {old_price} -> {listing.price}"
+        )
+        return
+    if notifier.send_price_drop(listing, old_price):
+        stats["notified"] += 1
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -55,8 +92,17 @@ def run_once(
                     console.log("  reasoner cap hit, deferring remaining to next run")
                     return
 
-                is_new = store.upsert(listing)
-                if not is_new:
+                result = store.upsert(listing)
+                if not result.is_new:
+                    # Known listing: the only news it can carry is a price
+                    # change. Dedup is the transition itself: the upsert above
+                    # already stored the new price, so this exact drop cannot
+                    # fire again next run. The flip side is that a failed send
+                    # loses the event; acceptable for a nice-to-have ping.
+                    if _significant_drop(cfg, result.old_price, listing.price):
+                        _handle_price_drop(
+                            cfg, store, notifier, listing, result.old_price, stats, dry_run
+                        )
                     continue
                 stats["new_count"] += 1
 
@@ -103,7 +149,7 @@ def build_and_run(dry_run: bool = False, verbose: bool = False) -> None:
     setup_logging(verbose=verbose)
     cfg = load_config(require_anthropic=not dry_run)
 
-    provider = ZillowRapidAPIProvider(api_key=cfg.rapidapi_key)
+    provider = make_provider(cfg.provider, rapidapi_key=cfg.rapidapi_key)
     store = Store(cfg.db_path)
     reasoner = None if dry_run else Reasoner(cfg.anthropic_api_key, cfg.reasoner)
     notifier: Notifier = ConsoleNotifier() if dry_run else make_notifier(cfg.discord_webhook_url)

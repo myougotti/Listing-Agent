@@ -64,17 +64,23 @@ provider --> filters --> store (dedup) --> reasoner (Claude) --> notifier
 
 - `src/listing_agent/config.py` loads `.env` and `criteria.yaml`
 - `src/listing_agent/models.py` defines `Listing` and `ReasonerVerdict`
-- `src/listing_agent/providers/zillow_rapidapi.py` is the only provider
-  for now. Behind a `Provider` Protocol so swapping is one file.
-- `src/listing_agent/store.py` SQLite, idempotency lives in the schema
+- `src/listing_agent/providers/zillow_rapidapi.py` default provider.
+  Behind a `Provider` Protocol so swapping is one file.
+- `src/listing_agent/providers/redfin.py` second provider, unofficial
+  Redfin endpoints, no key. Selected via `provider:` in criteria.yaml.
+- `src/listing_agent/store.py` SQLite, idempotency lives in the schema.
+  Also `price_history`, which feeds the price-drop detector.
 - `src/listing_agent/filters.py` pure functions, no I/O
 - `src/listing_agent/reasoner.py` Claude call with tool-use forcing
-- `src/listing_agent/notifier.py` Discord and console sinks
+- `src/listing_agent/notifier.py` Discord and console sinks, including
+  `send_price_drop`
 - `src/listing_agent/pipeline.py` the only file that knows about all
   the others
+- `src/listing_agent/dashboard.py` stdlib read-only web view,
+  `python -m listing_agent --dashboard`
 
-All 10 tests pass in the initial scaffold. If you change something and
-tests start failing, that is a signal, not noise.
+All tests should pass at all times (59 as of the stretch-goal work). If
+you change something and tests start failing, that is a signal, not noise.
 
 ## Build order
 
@@ -93,6 +99,14 @@ Asmyou is working through this in stages. Track which one we are on.
    Discuss the tradeoff before picking.
 7. **Stretch goals (only after 1 through 6 work).** Redfin provider,
    price-drop detector, web dashboard.
+
+Status: the code for every stage including the stretch goals is written
+and unit-tested. What remains is live verification with real keys, which
+only Asmyou can do: stages 1 and 2 (one real `--dry-run` against
+RapidAPI), 3 (criteria tuning from real data), 4 (capped reasoner run),
+5 (Discord webhook). The Redfin provider needs the same stage-1-style
+check since its endpoints are undocumented. Scheduler files exist for
+both options; the GitHub Actions vs Task Scheduler choice is still open.
 
 When in doubt about which stage we are on, ask.
 

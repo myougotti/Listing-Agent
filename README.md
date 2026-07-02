@@ -60,9 +60,56 @@ python -m listing_agent --dry-run
 # Verbose
 python -m listing_agent -v
 
+# Local read-only dashboard over the SQLite state (no API keys needed)
+python -m listing_agent --dashboard          # http://127.0.0.1:8765
+python -m listing_agent --dashboard --port 9000
+
 # Tests
 pytest
 ```
+
+## Providers
+
+The provider is picked in `criteria.yaml`:
+
+```yaml
+provider: "zillow_rapidapi"   # or "redfin"
+```
+
+- `zillow_rapidapi` (default) needs `RAPIDAPI_KEY` and a `zillow-com1`
+  subscription.
+- `redfin` talks to Redfin's unofficial "stingray" endpoints and needs no
+  key. Those endpoints are undocumented and can change without notice, so
+  give it the same stage-1 sanity check the Zillow provider got: one real
+  `--dry-run` and eyeball the parse. Redfin ids are stored prefixed
+  (`redfin:12345`), so both providers can share one database without
+  collisions.
+
+## Price drops
+
+Once a listing is in the store, later polls compare its price against what
+we last saw. A drop of at least `price_drops.min_drop_pct` (default 3%)
+triggers a notification, with two deliberate properties:
+
+- Hard filters run against the NEW price. A listing that was over budget
+  and drops into range notifies; one that drops but stays over budget
+  stays silent.
+- No Claude call is made. The listing already cleared storage once, and
+  the delta itself is the news, so drops are free.
+
+Dedup is the price transition itself: the store records the new price in
+the same pass, so a given drop can only fire once. Every observed price
+lands in the `price_history` table, which the dashboard reads.
+
+## Dashboard
+
+`python -m listing_agent --dashboard` serves a read-only page at
+`http://127.0.0.1:8765` showing stat tiles, recent listings (with price
+change counts), notifications, and run history. It is stdlib-only
+(`http.server`), binds loopback only, executes no JavaScript, and never
+writes to the database, so it is safe to leave running next to the poller.
+It only needs `LISTING_AGENT_DB_PATH` (or the default `data/seen.db`), no
+API keys.
 
 ## OneDrive gotcha
 
@@ -105,14 +152,16 @@ Or set it up by hand:
 src/listing_agent/
   config.py        load .env and criteria.yaml
   models.py        Listing, ReasonerVerdict
-  store.py         SQLite (listings, notifications, runs)
+  store.py         SQLite (listings, price_history, notifications, runs)
   filters.py       pure functions over Listing
   reasoner.py      Claude scorer (tool-use forced JSON)
   notifier.py      Discord + console sinks
   providers/
     base.py        Provider Protocol
     zillow_rapidapi.py
+    redfin.py      unofficial stingray endpoints, no key
   pipeline.py      one-pass orchestration
+  dashboard.py     stdlib read-only web view of the store
   cli.py           argparse entry point
 ```
 
@@ -138,12 +187,12 @@ rather than producing garbage state.
 
 1. Create `src/listing_agent/providers/<name>.py`.
 2. Implement the `Provider` Protocol from `base.py`.
-3. Export it in `providers/__init__.py`.
-4. Wire it in `pipeline.build_and_run` (or make the provider configurable
-   via `criteria.yaml`).
+3. Register it in `make_provider` in `providers/__init__.py`.
+4. Select it with `provider: "<name>"` in `criteria.yaml`.
 
-The pipeline never touches provider internals, so this is the only file
-that changes.
+The pipeline never touches provider internals, so this is the only place
+that changes. `providers/redfin.py` is the worked example: a second source
+added without touching the pipeline.
 
 ## Cost ceiling
 

@@ -73,3 +73,32 @@ def test_empty_zip_codes_raises(base_env, tmp_path):
     p.write_text("zip_codes: []\n", encoding="utf-8")
     with pytest.raises(ValueError, match="zip_codes"):
         load_config(p)
+
+
+def test_defaults_for_provider_and_price_drops(base_env, criteria_file):
+    cfg = load_config(criteria_file)
+    assert cfg.provider == "zillow_rapidapi"
+    assert cfg.price_drops.enabled is True
+    assert cfg.price_drops.min_drop_pct == 3.0
+
+
+def test_price_drops_section_is_parsed(base_env, tmp_path):
+    p = tmp_path / "criteria.yaml"
+    p.write_text(
+        MINIMAL_CRITERIA + "\nprice_drops:\n  enabled: false\n  min_drop_pct: 5\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(p)
+    assert cfg.price_drops.enabled is False
+    assert cfg.price_drops.min_drop_pct == 5
+
+
+def test_redfin_provider_does_not_require_rapidapi_key(base_env, tmp_path, monkeypatch):
+    # Redfin's endpoints are unauthenticated; requiring RAPIDAPI_KEY anyway
+    # would block the provider swap the Protocol exists for.
+    monkeypatch.setenv("RAPIDAPI_KEY", "")
+    p = tmp_path / "criteria.yaml"
+    p.write_text(MINIMAL_CRITERIA + '\nprovider: "redfin"\n', encoding="utf-8")
+    cfg = load_config(p)
+    assert cfg.provider == "redfin"
+    assert cfg.rapidapi_key == ""

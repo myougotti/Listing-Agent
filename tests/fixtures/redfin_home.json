@@ -1,0 +1,19 @@
+{
+  "propertyId": 123456789,
+  "listingId": 987654321,
+  "mlsId": {"label": "MLS#", "value": "5551234"},
+  "price": {"value": 525000, "level": 1},
+  "beds": 3,
+  "baths": 2,
+  "sqFt": {"value": 1620, "level": 1},
+  "lotSize": {"value": 6500, "level": 1},
+  "streetLine": {"value": "4501 Sunset Trl", "level": 1},
+  "city": "Austin",
+  "state": "TX",
+  "postalCode": {"value": "78704", "level": 1},
+  "url": "/TX/Austin/4501-Sunset-Trl-78704/home/123456789",
+  "dom": {"value": 5, "level": 1},
+  "propertyType": 6,
+  "uiPropertyType": 1,
+  "latLong": {"value": {"latitude": 30.2451, "longitude": -97.7659}, "level": 1}
+}

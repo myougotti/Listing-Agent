@@ -101,6 +101,42 @@ def test_discord_returns_false_on_network_error():
     assert ok is False
 
 
+# ----- price drops -----------------------------------------------------
+
+
+def test_console_price_drop_shows_old_and_new(capsys):
+    ok = ConsoleNotifier().send_price_drop(make_listing(price=480_000), old_price=500_000)
+    out = capsys.readouterr().out
+    assert ok is True
+    assert "$500,000 -> $480,000" in out
+    assert "-4.0%" in out
+
+
+def test_discord_price_drop_embed():
+    with patch("listing_agent.notifier.requests.post") as post:
+        post.return_value = SimpleNamespace(status_code=204, text="")
+        ok = DiscordNotifier("https://discord.test/hook").send_price_drop(
+            make_listing(price=480_000), old_price=500_000
+        )
+
+    assert ok is True
+    embed = post.call_args.kwargs["json"]["embeds"][0]
+    assert embed["title"] == "Price drop: 1 Test St"
+    assert "$500,000 -> $480,000" in embed["description"]
+    field_names = [f["name"] for f in embed["fields"]]
+    assert "New price" in field_names
+    assert "Was" in field_names
+
+
+def test_discord_price_drop_returns_false_on_http_error():
+    with patch("listing_agent.notifier.requests.post") as post:
+        post.return_value = SimpleNamespace(status_code=400, text="bad request")
+        ok = DiscordNotifier("https://discord.test/hook").send_price_drop(
+            make_listing(price=480_000), old_price=500_000
+        )
+    assert ok is False
+
+
 # ----- factory ---------------------------------------------------------
 
 

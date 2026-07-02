@@ -29,6 +29,16 @@ class Notifier(Protocol):
         run can continue."""
         ...
 
+    def send_price_drop(self, listing: Listing, old_price: int) -> bool:
+        """Notify that a known listing dropped from old_price to listing.price.
+        No verdict: drops skip the reasoner because the delta itself is the
+        news. Same success contract as send()."""
+        ...
+
+
+def _drop_pct(old_price: int, new_price: int) -> float:
+    return (old_price - new_price) / old_price * 100
+
 
 # ----- console sink (default if no webhook configured) ----------------
 
@@ -46,6 +56,12 @@ class ConsoleNotifier:
             print("  + " + " | ".join(verdict.highlights))
         if verdict.red_flags:
             print("  ! " + " | ".join(verdict.red_flags))
+        print(f"  {listing.url}")
+        return True
+
+    def send_price_drop(self, listing: Listing, old_price: int) -> bool:
+        pct = _drop_pct(old_price, listing.price)
+        print(f"[PRICE DROP -{pct:.1f}%] {listing.address} ${old_price:,} -> ${listing.price:,}")
         print(f"  {listing.url}")
         return True
 
@@ -110,6 +126,30 @@ class DiscordNotifier:
         if listing.image_url:
             embed["thumbnail"] = {"url": listing.image_url}
 
+        return self._post(embed)
+
+    def send_price_drop(self, listing: Listing, old_price: int) -> bool:
+        pct = _drop_pct(old_price, listing.price)
+        embed = {
+            "title": f"Price drop: {listing.address or listing.zpid}",
+            "url": listing.url,
+            "description": f"${old_price:,} -> ${listing.price:,} (-{pct:.1f}%)",
+            "color": 0xE67E22,
+            "fields": [
+                {"name": "New price", "value": f"${listing.price:,}", "inline": True},
+                {"name": "Was", "value": f"${old_price:,}", "inline": True},
+                {
+                    "name": "Beds/Baths",
+                    "value": f"{listing.beds}/{listing.baths}",
+                    "inline": True,
+                },
+            ],
+        }
+        if listing.image_url:
+            embed["thumbnail"] = {"url": listing.image_url}
+        return self._post(embed)
+
+    def _post(self, embed: dict) -> bool:
         payload = {"username": "Listing Agent", "embeds": [embed]}
         try:
             r = requests.post(self._url, json=payload, timeout=10)

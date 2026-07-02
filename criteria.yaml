@@ -1,5 +1,11 @@
 # Copy to criteria.yaml and edit. Loaded by config.py at startup.
 
+# Listing source. zillow_rapidapi needs RAPIDAPI_KEY in .env; redfin uses
+# Redfin's unofficial endpoints and needs no key. Swapping providers resets
+# nothing: dedup is keyed by provider-prefixed ids, so both can coexist in
+# one database.
+provider: "zillow_rapidapi"
+
 # Zip codes to poll. Keep this list short on the free tier.
 zip_codes:
   - "78704"
@@ -38,6 +44,14 @@ preferences:
 reasoner:
   min_score_to_notify: 70
   model: "claude-sonnet-4-6"   # adjust as needed
+
+# Price-drop pings on listings we already know about. No Claude call is made
+# for these; the drop itself is the signal. Filters still apply at the new
+# price, so a drop into budget notifies and a drop that stays over budget
+# does not.
+price_drops:
+  enabled: true
+  min_drop_pct: 3.0            # ignore drops smaller than this percentage
 
 # Polling cadence is set by the scheduler, not here. See .github/workflows/poll.yml
 # or Task Scheduler. Listed for reference only.
